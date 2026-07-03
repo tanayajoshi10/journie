@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>journie — your travel scrapbook</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@500;600;700&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --paper:#FBF3E3; --paper-dark:#F2E6CC; --ocean:#CFEBF2; --ocean-deep:#B7DEE8;
+    --land:#9FC8A0; --land-dark:#84B586; --coral:#FF9B7D; --coral-dark:#F17E5C;
+    --gold:#FFC857; --cocoa:#6B4A38; --cocoa-soft:#8A6652; --ink:#4A3629; --white:#FFFDF8;
+    --shadow: 0 6px 0 rgba(107,74,56,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+  body{ font-family:'Quicksand',sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  h1,h2,h3,.display{font-family:'Baloo 2',cursive;}
+  .app{ display:flex; width:100vw; height:100vh; }
+
+  /* ---------- SIDEBAR ---------- */
+  .sidebar{ width:290px; min-width:290px; background: repeating-linear-gradient(90deg, rgba(0,0,0,0.02) 0 2px, transparent 2px 40px), linear-gradient(180deg, var(--paper-dark), var(--paper)); border-right:4px dashed rgba(107,74,56,0.25); padding:22px 18px; display:flex; flex-direction:column; gap:16px; position:relative; z-index:500; }
+  .logo{ display:flex; align-items:center; gap:10px; padding-bottom:4px; }
+  .logo-badge{ width:44px;height:44px; background:var(--coral); border-radius:14px; display:flex;align-items:center;justify-content:center; font-size:22px; box-shadow:var(--shadow); transform:rotate(-6deg); }
+  .logo-text{ font-size:28px; font-weight:700; color:var(--cocoa); letter-spacing:0.5px; }
+  .logo-sub{ font-size:11px; color:var(--cocoa-soft); font-weight:600; margin-top:-4px; letter-spacing:0.5px; }
+
+  .nav-btn{ all:unset; display:flex; align-items:center; gap:12px; padding:13px 16px; background:var(--white); border-radius:16px; border:2.5px solid var(--cocoa); box-shadow:0 4px 0 var(--cocoa); font-family:'Baloo 2',cursive; font-weight:600; font-size:15.5px; color:var(--ink); cursor:pointer; transition:transform .08s ease; }
+  .nav-btn:hover{ background:#FFFAF0; }
+  .nav-btn:active{ transform:translateY(4px); box-shadow:0 0 0 var(--cocoa); }
+  .nav-btn .emoji{ font-size:19px; }
+  .nav-btn.active{ background:var(--gold); }
+
+  .stat-strip{ display:flex; gap:8px; }
+  .stat-pill{ flex:1; background:var(--white); border:2px solid rgba(107,74,56,0.35); border-radius:12px; padding:8px 6px; text-align:center; }
+  .stat-pill .num{ font-family:'Baloo 2'; font-size:20px; color:var(--coral-dark); font-weight:700;}
+  .stat-pill .lbl{ font-size:10px; color:var(--cocoa-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;}
+
+  .trip-list-wrap{ flex:1; overflow-y:auto; padding-right:2px; min-height:60px; }
+  .trip-list-title{ font-size:12px; font-weight:700; color:var(--cocoa-soft); text-transform:uppercase; letter-spacing:0.6px; margin:2px 0 8px 4px; }
+  .trip-card{ background:var(--white); border-radius:14px; border:2px solid rgba(107,74,56,0.2); padding:9px 10px; margin-bottom:8px; cursor:pointer; display:flex; gap:9px; align-items:center; transition: transform .1s ease, box-shadow .1s ease; }
+  .trip-card:hover{ transform:translateX(3px); box-shadow:3px 3px 0 rgba(107,74,56,0.15); }
+  .trip-swatch{ width:32px;height:32px;border-radius:9px; display:flex;align-items:center;justify-content:center; font-size:16px; flex-shrink:0; }
+  .trip-info{ flex:1; min-width:0; }
+  .trip-info .name{ font-family:'Baloo 2'; font-size:13px; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .trip-info .date{ font-size:10px; color:var(--cocoa-soft); font-weight:600;}
+  .trip-del{ all:unset; cursor:pointer; font-size:14px; padding:4px 6px; border-radius:8px; flex-shrink:0; opacity:0.55; }
+  .trip-del:hover{ opacity:1; background:#FFE3DC; }
+
+  .empty-sidebar{ background:var(--white); border:2px dashed rgba(107,74,56,0.3); border-radius:14px; padding:16px 12px; text-align:center; font-size:12px; color:var(--cocoa-soft); font-weight:600; line-height:1.5; }
+  .footer-note{ font-size:10.5px; color:var(--cocoa-soft); text-align:center; padding-top:6px; border-top:2px dashed rgba(107,74,56,0.2); }
+
+  /* ---------- MAP AREA ---------- */
+  .map-area{ flex:1; position:relative; }
+  #map{ position:absolute; inset:0; background:var(--ocean); }
+  .leaflet-tile-pane{ filter: sepia(0.14) saturate(1.3) hue-rotate(-8deg) brightness(1.05) contrast(0.97); }
+  .leaflet-control-attribution{ font-size:9px !important; background:rgba(255,253,248,0.85) !important; }
+  .leaflet-container{ font-family:'Quicksand',sans-serif; }
+
+  .map-header{ position:absolute; top:20px; left:24px; z-index:600; background:var(--white); border:2.5px solid var(--cocoa); border-radius:16px; padding:8px 18px; box-shadow:var(--shadow); max-width:55%; }
+  .map-header h1{ font-size:18px; margin:0; color:var(--ink); }
+  .map-header span{ font-size:11px; color:var(--cocoa-soft); font-weight:600; }
+
+  .map-controls{ position:absolute; top:20px; right:24px; z-index:600; display:flex; flex-direction:column; gap:8px; }
+  .map-ctrl-btn{ all:unset; cursor:pointer; width:42px; height:42px; background:var(--white); border:2.5px solid var(--cocoa); border-radius:12px; display:flex;align-items:center;justify-content:center; font-size:18px; box-shadow:var(--shadow); }
+  .map-ctrl-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--cocoa); }
+  .map-ctrl-btn.locate.tracking{ background:var(--gold); }
+
+  .loc-banner{ position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:650; background:var(--white); border:2.5px solid var(--cocoa); border-radius:14px; padding:10px 16px; font-size:12.5px; font-weight:600; color:var(--ink); box-shadow:var(--shadow); display:none; max-width:min(420px,80vw); text-align:center; }
+  .loc-banner.show{ display:block; }
+  .loc-banner button{ all:unset; cursor:pointer; font-family:'Baloo 2'; font-weight:600; color:var(--coral-dark); margin-left:6px; text-decoration:underline; }
+
+  /* ---------- custom markers (plain HTML, not SVG — avoids transform conflicts) ---------- */
+  .jr-pin-wrap{ background:transparent; border:none; }
+  .jr-pin{ width:32px;height:32px;border-radius:50%; border:2.5px solid var(--cocoa); display:flex;align-items:center;justify-content:center; font-size:15px; box-shadow:0 3px 0 rgba(107,74,56,0.35); transition:transform .12s ease; }
+  .jr-pin-wrap:hover .jr-pin{ transform:translateY(-3px) scale(1.08); }
+
+  .fox-wrap{ background:transparent; border:none; }
+  .fox-pulse{ position:absolute; top:14px; left:14px; width:16px;height:16px; margin:-8px 0 0 -8px; border-radius:50%; border:2px solid var(--coral); animation:jrPulse 2.2s ease-out infinite; }
+  .fox-avatar{ width:44px; animation:jrBob 2.4s ease-in-out infinite; }
+  @keyframes jrBob{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-4px);} }
+  @keyframes jrPulse{ 0%{ transform:scale(0.4); opacity:0.7;} 70%{ transform:scale(2.4); opacity:0;} 100%{ opacity:0;} }
+
+  .leaflet-popup-content-wrapper{ background:var(--white); border:2.5px solid var(--cocoa); border-radius:16px; box-shadow:var(--shadow); }
+  .leaflet-popup-tip{ background:var(--white); border:2.5px solid var(--cocoa); }
+  .leaflet-popup-content{ margin:12px; width:190px !important; }
+  .leaflet-popup-close-button{ color:var(--cocoa-soft) !important; font-size:18px !important; }
+  .popup-photo{ width:100%; height:64px; border-radius:10px; display:flex;align-items:center;justify-content:center; font-size:24px; margin-bottom:8px; }
+  .popup-content h3{ margin:0 0 2px 0; font-size:14px; color:var(--ink); font-family:'Baloo 2'; }
+  .popup-content .pdate{ font-size:10.5px; color:var(--cocoa-soft); font-weight:700; margin-bottom:6px;}
+  .popup-content .pnote{ color:var(--ink); line-height:1.4; margin-bottom:8px; font-size:12px;}
+  .popup-content button{ all:unset; cursor:pointer; font-family:'Baloo 2'; font-weight:600; font-size:12px; background:var(--coral); color:white; padding:6px 12px; border-radius:10px; box-shadow:0 3px 0 var(--coral-dark); }
+  .popup-content button:active{ transform:translateY(3px); box-shadow:none; }
+
+  /* ---------- OVERLAY / MODAL BASE ---------- */
+  .overlay{ position:fixed; inset:0; background:rgba(74,54,41,0.45); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .overlay.show{ display:flex; }
+
+  /* ---------- DIARY BOOK ---------- */
+  .book-wrap{ perspective:2400px; width:min(880px, 92vw); height:min(580px, 86vh); }
+  .book{ width:100%; height:100%; background:linear-gradient(180deg, #8A5A3E, #6B4227); border-radius:18px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); display:flex; flex-direction:column; padding:20px; position:relative; }
+  .book-close{ position:absolute; top:-16px; right:-16px; width:38px;height:38px; border-radius:50%; background:var(--coral); border:3px solid white; color:white; font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,0.3); z-index:50; }
+  .page-spread{ flex:1; display:flex; background:var(--paper); border-radius:8px; overflow:hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.08); position:relative; min-height:0; }
+  .page{ flex:1; padding:24px 22px; position:relative; display:flex; flex-direction:column; overflow-y:auto; background: repeating-linear-gradient(180deg, transparent 0 31px, rgba(107,74,56,0.12) 31px 32px), var(--paper); }
+  .page.left{ border-right:2px dashed rgba(107,74,56,0.25); }
+  .page-field-label{ font-size:11px; font-weight:700; color:var(--cocoa-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px; }
+  .page-field{ font-family:'Baloo 2'; font-size:19px; color:var(--ink); margin-bottom:14px; background:transparent; border:none; border-bottom:2px solid rgba(107,74,56,0.25); width:100%; padding-bottom:4px; outline:none; }
+  .page-field:disabled{ color:var(--ink); opacity:1; border-bottom-color:transparent; }
+  .emoji-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  .emoji-pick{ all:unset; cursor:pointer; width:34px;height:34px; border-radius:10px; display:flex;align-items:center;justify-content:center; font-size:17px; border:2px solid rgba(107,74,56,0.2); background:var(--white); }
+  .emoji-pick.selected{ border-color:var(--coral); background:#FFE3DC; }
+  .page-photo{ margin-top:auto; width:100%; height:100px; border-radius:12px; display:flex;align-items:center;justify-content:center; font-size:34px; position:relative; flex-shrink:0; }
+  .page-photo .tape{ position:absolute; top:-10px; left:20px; transform:rotate(-4deg); width:50px;height:20px;background:rgba(159,200,160,0.85); border:1px solid rgba(107,74,56,0.2); }
+  .page-photo .tape.t2{ left:auto; right:20px; transform:rotate(5deg); background:rgba(255,200,87,0.85);}
+  .diary-textarea{ flex:1; width:100%; resize:none; border:none; outline:none; background:transparent; font-family:'Caveat', cursive; font-size:22px; line-height:31px; color:var(--ink); padding-top:2px; min-height:120px; }
+  .diary-textarea:disabled{ opacity:1; color:var(--ink); }
+  .page-empty{ margin:auto; text-align:center; color:var(--cocoa-soft); }
+  .page-empty .big{ font-size:44px; margin-bottom:8px;}
+  .page-empty .msg{ font-size:13px; font-weight:600; max-width:220px; margin:0 auto 14px; line-height:1.5;}
+
+  .flip-layer{ position:absolute; top:0; left:50%; width:50%; height:100%; transform-origin:left center; transition: transform .6s cubic-bezier(.4,.2,.2,1); background:var(--paper); z-index:10; backface-visibility:hidden; box-shadow:-6px 0 16px rgba(0,0,0,0.08); pointer-events:none; opacity:0; }
+  .flip-layer.flipping{ transform: rotateY(-180deg); opacity:1; }
+
+  .book-nav{ display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px; flex-wrap:wrap; }
+  .book-nav-left, .book-nav-right{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .flip-btn{ all:unset; cursor:pointer; font-family:'Baloo 2'; font-weight:600; font-size:13.5px; background:var(--gold); color:var(--ink); padding:9px 16px; border-radius:12px; box-shadow:0 3px 0 #D9A53E; }
+  .flip-btn:active{ transform:translateY(3px); box-shadow:none; }
+  .flip-btn:disabled{ opacity:0.35; cursor:default; }
+  .flip-btn.primary{ background:var(--coral); color:white; box-shadow:0 3px 0 var(--coral-dark); }
+  .flip-btn.danger{ background:#FFD3D9; box-shadow:0 3px 0 #E0929E; }
+  .book-nav .page-indicator{ font-size:12px; color:white; font-weight:600; }
+
+  /* ---------- SIDE PANEL ---------- */
+  .side-panel{ position:fixed; top:0; right:-380px; width:370px; height:100%; background:var(--paper); border-left:4px dashed rgba(107,74,56,0.3); box-shadow:-8px 0 24px rgba(0,0,0,0.15); z-index:900; padding:24px 20px; overflow-y:auto; transition: right .35s cubic-bezier(.4,.2,.2,1); }
+  .side-panel.show{ right:0; }
+  .side-panel h2{ margin:0 0 4px 0; font-size:22px; color:var(--ink); }
+  .side-panel .sub{ font-size:12px; color:var(--cocoa-soft); font-weight:600; margin-bottom:18px;}
+  .panel-close{ position:absolute; top:18px; right:18px; cursor:pointer; font-size:20px; color:var(--cocoa-soft); font-weight:700; }
+
+  .postcard{ background:var(--white); border:2.5px solid var(--cocoa); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:var(--shadow); position:relative; }
+  .postcard .stamp{ position:absolute; top:10px; right:10px; width:36px;height:44px; background:repeating-linear-gradient(45deg, var(--coral), var(--coral) 6px, var(--gold) 6px, var(--gold) 12px); border:2px dashed var(--cocoa); border-radius:4px; }
+  .postcard .photo{ width:100%; height:130px; border-radius:10px; margin-bottom:10px; display:flex; align-items:center; justify-content:center; font-size:40px; }
+  .postcard h3{ margin:0 0 4px; font-size:16px;}
+  .postcard p{ margin:0; font-family:'Caveat',cursive; font-size:19px; color:var(--ink); line-height:1.3;}
+
+  .picker-row{ display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px; }
+  .picker-chip{ all:unset; cursor:pointer; flex-shrink:0; font-size:11px; font-weight:700; font-family:'Baloo 2'; background:var(--white); border:2px solid rgba(107,74,56,0.3); padding:6px 12px; border-radius:10px; white-space:nowrap; }
+  .picker-chip.selected{ background:var(--coral); color:white; border-color:var(--coral-dark); }
+
+  .share-btn{ all:unset; display:block; width:100%; text-align:center; cursor:pointer; font-family:'Baloo 2'; font-weight:600; font-size:14px; color:white; background:var(--coral); padding:11px; border-radius:12px; box-shadow:0 3px 0 var(--coral-dark); margin-bottom:10px; }
+  .share-btn:active{ transform:translateY(3px); box-shadow:none; }
+
+  .honesty-note{ background:#FFF3D6; border:2px dashed #D9A53E; border-radius:12px; padding:10px 12px; font-size:11.5px; color:var(--cocoa); font-weight:600; line-height:1.5; margin-bottom:14px; }
+
+  .place-card{ background:var(--white); border:2px solid rgba(107,74,56,0.3); border-radius:14px; padding:12px; display:flex; gap:12px; align-items:center; margin-bottom:10px; }
+  .place-icon{ font-size:24px; width:42px;height:42px;background:var(--paper-dark); border-radius:12px; display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .place-info{ flex:1; min-width:0; }
+  .place-info .name{ font-family:'Baloo 2'; font-size:13.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .place-info .desc{ font-size:10.5px; color:var(--cocoa-soft); font-weight:600;}
+  .place-link{ all:unset; cursor:pointer; font-size:10.5px; font-weight:700; color:var(--coral-dark); text-decoration:underline; flex-shrink:0; }
+
+  .empty-hint{ background:var(--white); border:2px dashed rgba(107,74,56,0.35); border-radius:14px; padding:16px; text-align:center; font-size:12.5px; color:var(--cocoa-soft); font-weight:600; }
+  .loading-hint{ text-align:center; padding:20px; font-size:13px; color:var(--cocoa-soft); font-weight:600; }
+  .spinner{ width:26px;height:26px; border:3px solid rgba(107,74,56,0.2); border-top-color:var(--coral); border-radius:50%; margin:0 auto 10px; animation:spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- SHARED POSTCARD VIEW ---------- */
+  .shared-view{ position:fixed; inset:0; background:var(--paper); z-index:2000; display:none; align-items:center; justify-content:center; flex-direction:column; gap:18px; }
+  .shared-view.show{ display:flex; }
+  .shared-view .postcard{ width:min(360px,86vw); }
+  .shared-view .photo{ height:180px; font-size:56px; }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:rgba(107,74,56,0.3); border-radius:8px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-badge">🧭</div>
+      <div>
+        <div class="logo-text">journie</div>
+        <div class="logo-sub">your travel scrapbook</div>
+      </div>
+    </div>
+
+    <button class="nav-btn" id="btn-document" onclick="Journie.openBook()"><span class="emoji">📖</span> Document Trip</button>
+    <button class="nav-btn" id="btn-share" onclick="Journie.openShare()"><span class="emoji">💌</span> Share Trip</button>
+    <button class="nav-btn" id="btn-discounts" onclick="Journie.openDiscounts()"><span class="emoji">🏷️</span> Find Discounts</button>
+
+    <div class="stat-strip">
+      <div class="stat-pill"><div class="num" id="stat-places">0</div><div class="lbl">places</div></div>
+      <div class="stat-pill"><div class="num" id="stat-continents">0</div><div class="lbl">continents</div></div>
+      <div class="stat-pill"><div class="num" id="stat-entries">0</div><div class="lbl">entries</div></div>
+    </div>
+
+    <div class="trip-list-wrap">
+      <div class="trip-list-title">Your pins</div>
+      <div id="trip-list"></div>
+    </div>
+
+    <div class="footer-note">tap a pin, or write a new page ✎</div>
+  </div>
+
+  <div class="map-area">
+    <div class="map-header">
+      <h1>the world, so far</h1>
+      <span id="map-sub">turn on location to see yourself on the map</span>
+    </div>
+    <div class="map-controls">
+      <button class="map-ctrl-btn locate" id="locate-btn" onclick="Journie.toggleLocate()" title="Locate me">📍</button>
+      <button class="map-ctrl-btn" onclick="Journie.zoomBy(1)" title="Zoom in">➕</button>
+      <button class="map-ctrl-btn" onclick="Journie.zoomBy(-1)" title="Zoom out">➖</button>
+      <button class="map-ctrl-btn" onclick="Journie.resetView()" title="Reset view">🌍</button>
+    </div>
+    <div id="map"></div>
+    <div class="loc-banner" id="loc-banner"></div>
+  </div>
+</div>
+
+<div class="overlay" id="book-overlay">
+  <div class="book-wrap">
+    <div class="book">
+      <div class="book-close" onclick="Journie.closeBook()">✕</div>
+      <div class="page-spread" id="page-spread">
+        <div class="page left" id="page-left"></div>
+        <div class="page right" id="page-right"></div>
+        <div class="flip-layer" id="flip-layer"></div>
+      </div>
+      <div class="book-nav" id="book-nav"></div>
+    </div>
+  </div>
+</div>
+
+<div class="side-panel" id="side-panel">
+  <div class="panel-close" onclick="Journie.closePanel()">✕</div>
+  <div id="panel-content"></div>
+</div>
+
+<div class="shared-view" id="shared-view"></div>
+
+<script>
+const FOX_SVG = '<svg viewBox="-20 -22 40 58" xmlns="http://www.w3.org/2000/svg">'
+  + '<ellipse cx="0" cy="34" rx="12" ry="4" fill="rgba(0,0,0,0.15)"/>'
+  + '<path d="M-14,-6 L-6,-18 L-2,-4 Z" fill="#F0824A" stroke="#6B4A38" stroke-width="1.5"/>'
+  + '<path d="M14,-6 L6,-18 L2,-4 Z" fill="#F0824A" stroke="#6B4A38" stroke-width="1.5"/>'
+  + '<path d="M-7,-8 L-4,-13 L-1,-7 Z" fill="#FFF6EA"/>'
+  + '<path d="M7,-8 L4,-13 L1,-7 Z" fill="#FFF6EA"/>'
+  + '<ellipse cx="0" cy="6" rx="15" ry="13" fill="#F0824A" stroke="#6B4A38" stroke-width="1.8"/>'
+  + '<ellipse cx="0" cy="11" rx="8" ry="6" fill="#FFF6EA"/>'
+  + '<circle cx="-5" cy="3" r="1.6" fill="#3A2A20"/>'
+  + '<circle cx="5" cy="3" r="1.6" fill="#3A2A20"/>'
+  + '<ellipse cx="0" cy="8" rx="2" ry="1.4" fill="#3A2A20"/>'
+  + '</svg>';
+
+const Journie = (function(){
+
+  // ---------------- AUDIO ----------------
+  let actx = null;
+  function ac(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+  function playBloop(){
+    try{
+      const c = ac();
+      const o = c.createOscillator(); const g = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(520, c.currentTime);
+      o.frequency.exponentialRampToValueAtTime(880, c.currentTime + 0.08);
+      g.gain.setValueAtTime(0.0001, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.18, c.currentTime + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.16);
+      o.connect(g); g.connect(c.destination);
+      o.start(); o.stop(c.currentTime + 0.18);
+    }catch(e){}
+  }
+  function playFlip(){
+    try{
+      const c = ac(); const dur = 0.35;
+      const bufferSize = c.sampleRate * dur;
+      const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i=0;i<bufferSize;i++){ const t = i/bufferSize; data[i] = (Math.random()*2-1) * Math.pow(1-t, 2.2); }
+      const noise = c.createBufferSource(); noise.buffer = buffer;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(1800, c.currentTime);
+      bp.frequency.exponentialRampToValueAtTime(3200, c.currentTime + dur*0.6);
+      bp.Q.value = 0.7;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.35, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+      noise.connect(bp); bp.connect(g); g.connect(c.destination);
+      noise.start();
+    }catch(e){}
+  }
+
+  // ---------------- STATE ----------------
+  let trips = [];
+  let avatar = null;         // {lat, lon, live}
+  let watchId = null;
+  let map = null;
+  let tripMarkers = {};
+  let avatarMarker = null;
+  let manualPinMode = false;
+  let locateState = 'idle'; // 'idle' | 'granted' | 'denied' — only ever asks the browser once per session
+  let bookMode = 'read';
+  let bookIndex = 0;
+  let editingId = null;
+  let draftEmoji = '📍';
+  let flipping = false;
+
+  const EMOJI_CHOICES = ['📍','🏖️','🏔️','🏙️','⛩️','🌴','🍜','🎡','🦁','🥐','🌋','🧊'];
+  const COLOR_CHOICES = ['#FFD9C9','#CDEBFF','#FFE8B0','#FFD3D9','#DDF2D8','#E4D9FF'];
+
+  // ---------------- STORAGE ----------------
+  async function loadTrips(){
+    try{
+      const res = await window.storage.get('journie:trips');
+      if(res && res.value){ trips = JSON.parse(res.value); }
+    }catch(e){ trips = []; }
+  }
+  async function saveTrips(){
+    try{ await window.storage.set('journie:trips', JSON.stringify(trips)); }catch(e){}
+  }
+
+  // ---------------- MAP (Leaflet + real OpenStreetMap tiles) ----------------
+  function initMap(){
+    map = L.map('map', { zoomControl:false, worldCopyJump:true }).setView([20, 10], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    map.on('click', (e)=>{
+      if(manualPinMode){
+        setAvatar(e.latlng.lat, e.latlng.lng, false);
+        manualPinMode = false;
+        hideLocBanner();
+        playBloop();
+      }
+    });
+  }
+  function zoomBy(dir){ playBloop(); if(dir>0) map.zoomIn(); else map.zoomOut(); }
+  function resetView(){ playBloop(); map.setView([20,10], 2); }
+
+  function pinIcon(t){
+    return L.divIcon({
+      className:'jr-pin-wrap',
+      html:'<div class="jr-pin" style="background:'+t.color+'">'+t.emoji+'</div>',
+      iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-14]
+    });
+  }
+  function foxIcon(){
+    return L.divIcon({
+      className:'fox-wrap',
+      html:'<div class="fox-pulse"></div><div class="fox-avatar">'+FOX_SVG+'</div>',
+      iconSize:[44,50], iconAnchor:[22,40]
+    });
+  }
+
+  function refreshMarkers(){
+    Object.values(tripMarkers).forEach(m=>map.removeLayer(m));
+    tripMarkers = {};
+    trips.forEach(t=>{
+      const marker = L.marker([t.lat, t.lon], { icon: pinIcon(t) }).addTo(map);
+      marker.bindPopup(popupHtml(t), { className:'journie-popup', maxWidth:210 });
+      tripMarkers[t.id] = marker;
+    });
+  }
+  function popupHtml(t){
+    return '<div class="popup-content">'
+      + '<div class="popup-photo" style="background:'+t.color+'">'+t.emoji+'</div>'
+      + '<h3>'+escapeHtml(t.name)+'</h3>'
+      + '<div class="pdate">'+escapeHtml(t.date)+'</div>'
+      + '<div class="pnote">'+escapeHtml(t.note.slice(0,80))+(t.note.length>80?'…':'')+'</div>'
+      + '<button onclick="Journie.openBookAt('+t.id+')">Read full entry</button>'
+      + '</div>';
+  }
+  function showPin(id){
+    const m = tripMarkers[id];
+    if(m) m.openPopup();
+  }
+
+  // ---------------- GEOLOCATION (live) ----------------
+  function toggleLocate(){
+    playBloop();
+    if(watchId !== null){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      document.getElementById('locate-btn').classList.remove('tracking');
+      document.getElementById('map-sub').textContent = 'live location paused';
+      return;
+    }
+    if(locateState === 'denied'){
+      // already asked the browser once this session — don't ask again, go straight to manual
+      armManualPin();
+      showLocBanner("Already asked for location this session, so I won't ask again — tap anywhere on the map to place your fox manually.", false);
+      return;
+    }
+    if(!('geolocation' in navigator)){
+      locateState = 'denied';
+      showLocBanner("This browser can't share location. Tap the map to drop your pin manually.", true);
+      return;
+    }
+    document.getElementById('map-sub').textContent = 'asking for location access…';
+    watchId = navigator.geolocation.watchPosition(
+      pos => {
+        locateState = 'granted';
+        document.getElementById('locate-btn').classList.add('tracking');
+        setAvatar(pos.coords.latitude, pos.coords.longitude, true);
+        document.getElementById('map-sub').textContent = 'tracking your live location 🦊';
+        hideLocBanner();
+      },
+      err => {
+        locateState = 'denied';
+        watchId = null;
+        document.getElementById('locate-btn').classList.remove('tracking');
+        document.getElementById('map-sub').textContent = 'location unavailable';
+        showLocBanner("Location access wasn't granted (" + err.message + "). I won't ask again this session — tap anywhere on the map to place your fox manually.", true);
+        armManualPin();
+      },
+      { enableHighAccuracy:true, maximumAge:10000, timeout:12000 }
+    );
+  }
+  function setAvatar(lat, lon, live){
+    const first = !avatar;
+    avatar = { lat, lon, live: !!live };
+    if(avatarMarker){
+      avatarMarker.setLatLng([lat, lon]);
+    } else {
+      avatarMarker = L.marker([lat, lon], { icon: foxIcon(), zIndexOffset: 1000 }).addTo(map);
+    }
+    if(first) map.setView([lat, lon], 12);
+  }
+  function showLocBanner(msg, offerManual){
+    const b = document.getElementById('loc-banner');
+    b.innerHTML = msg + (offerManual ? ' <button onclick="Journie.armManualPin()">Place pin manually</button>' : '');
+    b.classList.add('show');
+  }
+  function hideLocBanner(){ document.getElementById('loc-banner').classList.remove('show'); }
+  function armManualPin(){
+    manualPinMode = true;
+    document.getElementById('map-sub').textContent = 'tap anywhere on the map to place your fox';
+  }
+
+  // ---------------- SIDEBAR LIST ----------------
+  function buildTripList(){
+    const el = document.getElementById('trip-list');
+    if(trips.length === 0){
+      el.innerHTML = '<div class="empty-sidebar">No pins yet 🌱<br>Click <b>Document Trip</b> to write your first entry.</div>';
+    } else {
+      el.innerHTML = trips.map(t=>
+        '<div class="trip-card">'
+        + '<div class="trip-swatch" style="background:'+t.color+'" onclick="Journie.focusTrip('+t.id+')">'+t.emoji+'</div>'
+        + '<div class="trip-info" onclick="Journie.focusTrip('+t.id+')"><div class="name">'+escapeHtml(t.name)+'</div><div class="date">'+escapeHtml(t.date)+'</div></div>'
+        + '<button class="trip-del" onclick="Journie.deleteTrip('+t.id+', event)" title="Delete">🗑️</button>'
+        + '</div>'
+      ).join('');
+    }
+    document.getElementById('stat-places').textContent = trips.length;
+    document.getElementById('stat-continents').textContent = new Set(trips.map(t=>continentOf(t.lat,t.lon))).size;
+    document.getElementById('stat-entries').textContent = trips.length;
+  }
+  function continentOf(lat, lon){
+    if(lat > 15 && lon < -30) return 'NA';
+    if(lat <= 15 && lat > -60 && lon < -30) return 'SA';
+    if(lat > 35 && lon >= -30 && lon < 60) return 'EU';
+    if(lat <= 35 && lat > -40 && lon >= -20 && lon < 55) return 'AF';
+    if(lon >= 55 && lat > -10) return 'AS';
+    return 'OC';
+  }
+  function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+  function focusTrip(id){
+    playBloop();
+    const t = trips.find(x=>x.id===id);
+    if(!t) return;
+    map.setView([t.lat, t.lon], 13);
+    setTimeout(()=>showPin(id), 400);
+  }
+
+  function deleteTrip(id, evt){
+    if(evt) evt.stopPropagation();
+    const t = trips.find(x=>x.id===id);
+    if(!t) return;
+    if(!confirm('Delete "'+t.name+'" from your scrapbook? This can\'t be undone.')) return;
+    trips = trips.filter(x=>x.id!==id);
+    saveTrips();
+    refreshMarkers(); buildTripList();
+    playBloop();
+  }
+
+  // ---------------- DIARY BOOK ----------------
+  function renderBook(){
+    const left = document.getElementById('page-left');
+    const right = document.getElementById('page-right');
+    const nav = document.getElementById('book-nav');
+
+    if(bookMode === 'empty'){
+      left.innerHTML = '<div class="page-empty"><div class="big">📔</div><div class="msg">Your scrapbook is empty. Every trip starts with a blank page.</div></div>';
+      right.innerHTML = '<div class="page-empty" style="margin-top:0;"><button class="flip-btn primary" onclick="Journie.startNewEntry()">✎ Write your first entry</button></div>';
+      nav.innerHTML = '';
+      return;
+    }
+
+    if(bookMode === 'write'){
+      const editing = editingId !== null ? trips.find(t=>t.id===editingId) : null;
+      left.innerHTML =
+        '<div class="page-field-label">Location</div>'
+        + '<input class="page-field" id="field-location" placeholder="Where did you go?" value="'+(editing?escapeHtml(editing.name):'')+'">'
+        + '<div class="page-field-label">Date</div>'
+        + '<input type="date" class="page-field" id="field-date" value="'+(editing?editing.date: new Date().toISOString().slice(0,10))+'">'
+        + '<div class="page-field-label">Pick a sticker</div>'
+        + '<div class="emoji-row" id="emoji-row"></div>'
+        + '<div class="page-photo" id="field-photo" style="background:'+(editing?editing.color:COLOR_CHOICES[0])+'">'+(editing?editing.emoji:EMOJI_CHOICES[0])+'<div class="tape"></div><div class="tape t2"></div></div>';
+      right.innerHTML =
+        '<div class="page-field-label">What you did</div>'
+        + '<textarea class="diary-textarea" id="field-note" placeholder="Write about your day...">'+(editing?editing.note:'')+'</textarea>'
+        + '<div id="geo-status" style="font-size:11px;color:var(--cocoa-soft);font-weight:600;margin-top:8px;"></div>';
+
+      draftEmoji = editing ? editing.emoji : EMOJI_CHOICES[0];
+      const row = document.getElementById('emoji-row');
+      row.innerHTML = EMOJI_CHOICES.map((e,i)=>
+        '<button type="button" class="emoji-pick'+(e===draftEmoji?' selected':'')+'" data-emoji="'+e+'" data-color="'+COLOR_CHOICES[i%COLOR_CHOICES.length]+'" onclick="Journie.pickEmoji(this)">'+e+'</button>'
+      ).join('');
+
+      nav.innerHTML =
+        '<div class="book-nav-left"><button class="flip-btn" onclick="Journie.cancelWrite()">Cancel</button></div>'
+        + '<div class="page-indicator">'+(editing?'editing entry':'new entry')+'</div>'
+        + '<div class="book-nav-right"><button class="flip-btn primary" onclick="Journie.saveEntry()">💾 Save entry</button></div>';
+      return;
+    }
+
+    const t = trips[bookIndex];
+    left.innerHTML =
+      '<div class="page-field-label">Location</div>'
+      + '<input class="page-field" disabled value="'+escapeHtml(t.name)+'">'
+      + '<div class="page-field-label">Date</div>'
+      + '<input class="page-field" disabled value="'+escapeHtml(t.date)+'">'
+      + '<div class="page-photo" style="background:'+t.color+'">'+t.emoji+'<div class="tape"></div><div class="tape t2"></div></div>';
+    right.innerHTML =
+      '<div class="page-field-label">What you did</div>'
+      + '<textarea class="diary-textarea" disabled>'+escapeHtml(t.note)+'</textarea>';
+
+    nav.innerHTML =
+      '<div class="book-nav-left">'
+        + '<button class="flip-btn" id="prev-btn" onclick="Journie.flipPage(-1)" '+(bookIndex===0?'disabled':'')+'>◀ prev</button>'
+      + '</div>'
+      + '<div class="page-indicator">'+(bookIndex+1)+' / '+trips.length+'</div>'
+      + '<div class="book-nav-right">'
+        + '<button class="flip-btn" onclick="Journie.editEntry('+t.id+')">✎ Edit</button>'
+        + '<button class="flip-btn danger" onclick="Journie.deleteTrip('+t.id+')">🗑️ Delete</button>'
+        + '<button class="flip-btn" onclick="Journie.startNewEntry()">+ New</button>'
+        + '<button class="flip-btn primary" id="next-btn" onclick="Journie.flipPage(1)" '+(bookIndex===trips.length-1?'disabled':'')+'>next ▶</button>'
+      + '</div>';
+  }
+
+  function pickEmoji(btn){
+    document.querySelectorAll('.emoji-pick').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    draftEmoji = btn.dataset.emoji;
+    const photo = document.getElementById('field-photo');
+    photo.style.background = btn.dataset.color;
+    photo.innerHTML = draftEmoji + '<div class="tape"></div><div class="tape t2"></div>';
+    playBloop();
+  }
+
+  function openBook(){
+    playBloop();
+    if(trips.length === 0){ bookMode = 'empty'; }
+    else { bookMode = 'read'; bookIndex = 0; }
+    document.getElementById('book-overlay').classList.add('show');
+    renderBook();
+    setActiveNav('btn-document');
+  }
+  function openBookAt(id){
+    const idx = trips.findIndex(t=>t.id===id);
+    bookMode = 'read'; bookIndex = idx>=0?idx:0;
+    document.getElementById('book-overlay').classList.add('show');
+    renderBook();
+    playBloop();
+    setActiveNav('btn-document');
+  }
+  function closeBook(){
+    playBloop();
+    document.getElementById('book-overlay').classList.remove('show');
+    clearActiveNav();
+  }
+  function startNewEntry(){
+    editingId = null; bookMode = 'write'; playFlip(); renderBook();
+  }
+  function editEntry(id){
+    editingId = id; bookMode = 'write'; playFlip(); renderBook();
+  }
+  function cancelWrite(){
+    if(trips.length === 0){ bookMode = 'empty'; }
+    else { bookMode = 'read'; bookIndex = Math.min(bookIndex, trips.length-1); }
+    playBloop(); renderBook();
+  }
+
+  async function saveEntry(){
+    const name = document.getElementById('field-location').value.trim();
+    const date = document.getElementById('field-date').value || new Date().toISOString().slice(0,10);
+    const note = document.getElementById('field-note').value.trim();
+    if(!name){ alert('Add a location before saving.'); return; }
+    const status = document.getElementById('geo-status');
+
+    let lat, lon;
+    const prior = editingId !== null ? trips.find(t=>t.id===editingId) : null;
+    if(prior){ lat = prior.lat; lon = prior.lon; }
+    const selected = document.querySelector('.emoji-pick.selected');
+    const color = selected ? selected.dataset.color : COLOR_CHOICES[0];
+
+    if(!prior || name !== prior.name){
+      status.textContent = 'finding that place on the map…';
+      try{
+        const geo = await geocode(name);
+        if(geo){ lat = geo.lat; lon = geo.lon; status.textContent = ''; }
+        else {
+          status.textContent = "couldn't find that place — using the map's current center instead.";
+          const c = map.getCenter(); lat = c.lat; lon = c.lng;
+        }
+      }catch(e){
+        status.textContent = 'map search is unavailable right now — using the current view center.';
+        const c = map.getCenter(); lat = c.lat; lon = c.lng;
+      }
+    }
+
+    if(prior){
+      prior.name = name; prior.date = date; prior.note = note; prior.emoji = draftEmoji; prior.color = color; prior.lat = lat; prior.lon = lon;
+    } else {
+      trips.push({ id: Date.now(), name, date, note, emoji: draftEmoji, color, lat, lon });
+      bookIndex = trips.length - 1;
+    }
+    await saveTrips();
+    refreshMarkers(); buildTripList();
+    map.setView([lat, lon], 12);
+    bookMode = 'read';
+    playFlip();
+    renderBook();
+  }
+
+  async function geocode(query){
+    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(query);
+    const res = await fetch(url, { headers: { 'Accept':'application/json' } });
+    if(!res.ok) throw new Error('geocode failed');
+    const data = await res.json();
+    if(data && data.length){ return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) }; }
+    return null;
+  }
+
+  function flipPage(dir){
+    if(flipping) return;
+    const nextIdx = bookIndex + dir;
+    if(nextIdx < 0 || nextIdx >= trips.length) return;
+    flipping = true;
+    playFlip();
+    const layer = document.getElementById('flip-layer');
+    layer.classList.add('flipping');
+    setTimeout(()=>{
+      bookIndex = nextIdx;
+      renderBook();
+      layer.classList.remove('flipping');
+      flipping = false;
+    }, 320);
+  }
+
+  // ---------------- SHARE PANEL (honest: real link, no fake friends feature) ----------------
+  function openShare(){
+    playBloop();
+    if(trips.length === 0){
+      document.getElementById('panel-content').innerHTML =
+        '<h2>share trip 💌</h2><div class="sub">nothing to share yet</div>'
+        + '<div class="empty-hint">Write your first entry, then come back here to send a postcard of it.</div>';
+      document.getElementById('side-panel').classList.add('show');
+      setActiveNav('btn-share');
+      return;
+    }
+    renderSharePanel(trips[trips.length-1].id);
+  }
+  function renderSharePanel(tripId){
+    const t = trips.find(x=>x.id===tripId) || trips[trips.length-1];
+    document.getElementById('panel-content').innerHTML =
+      '<h2>share trip 💌</h2><div class="sub">send a postcard of your favorite memory</div>'
+      + '<div class="picker-row">' + trips.map(tr =>
+          '<button class="picker-chip'+(tr.id===t.id?' selected':'')+'" onclick="Journie.renderSharePanel('+tr.id+')">'+tr.emoji+' '+escapeHtml(tr.name.split(',')[0])+'</button>'
+        ).join('') + '</div>'
+      + '<div class="postcard"><div class="stamp"></div>'
+        + '<div class="photo" style="background:'+t.color+'">'+t.emoji+'</div>'
+        + '<h3>'+escapeHtml(t.name)+'</h3>'
+        + '<p>"'+escapeHtml(t.note.slice(0,70))+(t.note.length>70?'…':'')+'"</p></div>'
+      + '<button class="share-btn" id="copy-link-btn" onclick="Journie.copyLink('+t.id+')">Copy shareable link</button>'
+      + '<div class="honesty-note">Being straight with you: there\'s no friends/follow system here — that would need real user accounts and a backend server, which a single-file app like this can\'t provide. Connecting to Instagram or Facebook for that isn\'t possible either without registering a developer app with them and going through their review process. What <b>does</b> work: the link above actually encodes this postcard, so anyone who opens it sees it — no account needed on either end.</div>';
+    document.getElementById('side-panel').classList.add('show');
+    setActiveNav('btn-share');
+  }
+  function copyLink(tripId){
+    playBloop();
+    const t = trips.find(x=>x.id===tripId);
+    const payload = { name:t.name, date:t.date, note:t.note, emoji:t.emoji, color:t.color };
+    const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
+    const url = location.origin + location.pathname + '#share=' + encoded;
+    const btn = document.getElementById('copy-link-btn');
+    const done = ()=>{ btn.textContent = 'Copied! ✓'; setTimeout(()=>{ btn.textContent = 'Copy shareable link'; }, 1600); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(done).catch(()=>{ prompt('Copy this link:', url); done(); });
+    } else {
+      prompt('Copy this link:', url); done();
+    }
+  }
+  function checkSharedLink(){
+    const m = location.hash.match(/#share=(.+)/);
+    if(!m) return;
+    try{
+      const data = JSON.parse(decodeURIComponent(atob(m[1])));
+      const view = document.getElementById('shared-view');
+      view.innerHTML =
+        '<div class="postcard"><div class="stamp"></div>'
+        + '<div class="photo" style="background:'+data.color+'">'+data.emoji+'</div>'
+        + '<h3>'+escapeHtml(data.name)+'</h3>'
+        + '<div style="font-size:11px;color:var(--cocoa-soft);font-weight:700;margin-bottom:6px;">'+escapeHtml(data.date)+'</div>'
+        + '<p>"'+escapeHtml(data.note)+'"</p></div>'
+        + '<button class="share-btn" style="width:min(360px,86vw);" onclick="document.getElementById(\'shared-view\').classList.remove(\'show\'); history.replaceState(null,\'\',location.pathname);">Open journie ✕</button>';
+      view.classList.add('show');
+    }catch(e){}
+  }
+
+  // ---------------- NEARBY PLACES (real OSM data; no fake discounts) ----------------
+  async function openDiscounts(){
+    playBloop();
+    setActiveNav('btn-discounts');
+    document.getElementById('side-panel').classList.add('show');
+
+    let center = null, label = null;
+    if(avatar){ center = avatar; label = avatar.live ? 'your live location' : 'your pinned location'; }
+    else if(trips.length){ center = trips[trips.length-1]; label = trips[trips.length-1].name; }
+
+    if(!center){
+      document.getElementById('panel-content').innerHTML =
+        '<h2>nearby spots 🏷️</h2><div class="sub">no location yet</div>'
+        + '<div class="empty-hint">Turn on 📍 live location, or write an entry, so I know where to look.</div>';
+      return;
+    }
+
+    document.getElementById('panel-content').innerHTML =
+      '<h2>nearby spots 🏷️</h2><div class="sub">real places near '+escapeHtml(label)+'</div>'
+      + '<div class="honesty-note">There\'s no live discount/coupon feed wired up — that needs a paid deals-partner API. Below are real, free places from OpenStreetMap, so at least the map is honest. Ready to plug in a discounts partner once you have a key.</div>'
+      + '<div class="loading-hint"><div class="spinner"></div>searching nearby…</div>';
+
+    try{
+      const places = await fetchNearbyPlaces(center.lat, center.lon);
+      const loadingEl = document.querySelector('.loading-hint');
+      if(loadingEl) loadingEl.remove();
+      if(!places.length){
+        document.getElementById('panel-content').insertAdjacentHTML('beforeend', '<div class="empty-hint">No named spots found nearby in OpenStreetMap\'s data for this area.</div>');
+        return;
+      }
+      const list = places.map(p=>
+        '<div class="place-card"><div class="place-icon">'+p.icon+'</div>'
+        + '<div class="place-info"><div class="name">'+escapeHtml(p.name)+'</div><div class="desc">'+p.category+'</div></div>'
+        + '<button class="place-link" onclick="window.open(\'https://www.openstreetmap.org/?mlat='+p.lat+'&mlon='+p.lon+'#map=18/'+p.lat+'/'+p.lon+'\',\'_blank\')">view</button>'
+        + '</div>'
+      ).join('');
+      document.getElementById('panel-content').insertAdjacentHTML('beforeend', list);
+    }catch(e){
+      const loadingEl = document.querySelector('.loading-hint');
+      if(loadingEl) loadingEl.outerHTML = '<div class="empty-hint">Couldn\'t reach the map data service just now. Try again in a moment.</div>';
+    }
+  }
+
+  async function fetchNearbyPlaces(lat, lon){
+    const query = '[out:json][timeout:15];('
+      + 'node["amenity"="cafe"](around:1500,'+lat+','+lon+');'
+      + 'node["tourism"="hotel"](around:1500,'+lat+','+lon+');'
+      + 'node["shop"~"gift|souvenir|convenience|bakery"](around:1500,'+lat+','+lon+');'
+      + ');out center 15;';
+    const res = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data=' + encodeURIComponent(query) });
+    if(!res.ok) throw new Error('overpass failed');
+    const data = await res.json();
+    const icons = { cafe:'☕', hotel:'🏨', gift:'🎁', souvenir:'🎁', convenience:'🏪', bakery:'🥐' };
+    return (data.elements || [])
+      .filter(el => el.tags && el.tags.name)
+      .slice(0, 10)
+      .map(el => {
+        const cat = el.tags.amenity || el.tags.tourism || el.tags.shop || 'place';
+        return { name: el.tags.name, category: cat.charAt(0).toUpperCase()+cat.slice(1), icon: icons[cat] || '📍', lat: el.lat, lon: el.lon };
+      });
+  }
+
+  function closePanel(){
+    playBloop();
+    document.getElementById('side-panel').classList.remove('show');
+    clearActiveNav();
+  }
+  function setActiveNav(id){ clearActiveNav(); document.getElementById(id).classList.add('active'); }
+  function clearActiveNav(){ ['btn-document','btn-share','btn-discounts'].forEach(id=>document.getElementById(id).classList.remove('active')); }
+
+  async function init(){
+    checkSharedLink();
+    initMap();
+    await loadTrips();
+    refreshMarkers();
+    buildTripList();
+  }
+
+  return {
+    showPin, focusTrip, openBookAt, openBook, closeBook, flipPage, startNewEntry, editEntry, cancelWrite, saveEntry, pickEmoji,
+    openShare, renderSharePanel, copyLink, openDiscounts, closePanel,
+    deleteTrip, zoomBy, resetView, toggleLocate, armManualPin, init
+  };
+})();
+
+Journie.init();
+</script>
+</body>
+</html>
